@@ -55,8 +55,7 @@ class BoxDetector:
         self.path_to_icons = r'./res/img/priconne/unit/'
         self._path_to_icons = os.path.expanduser(self.path_to_icons)
 
-        self.sift_n_features = 200
-        self.classify_thresh = 15
+        self.classify_thresh = 10
         self.star_position_xs = [
             26, 50, 74, 98, 122
         ]
@@ -69,6 +68,17 @@ class BoxDetector:
         self.f_cid = lambda s: int(s[10:14])
         self.f_star = lambda s: int(s[14])
 
+        # self._detector = cv2.BRISK(thresh=10, octaves=1)
+
+        # self._extractor = cv2.DescriptorExtractor_create("BRISK")
+        self._extractor = cv2.xfeatures2d.SIFT_create()
+        # self._extractor = cv2.xfeatures2d.SURF_create()
+
+        self._matcher = cv2.BFMatcher(cv2.NORM_L2)
+        # index_params = dict(algorithm=0, trees=5)
+        # search_params = dict(checks=50)
+        # self._matcher = cv2.FlannBasedMatcher(index_params, search_params)
+
     def available(self) -> bool:
         """Test if detector is available
 
@@ -80,13 +90,12 @@ class BoxDetector:
                    path_to_icon: str = ...,
                    f_cid: Callable[[str], int] = ...,
                    f_star: Callable[[str], int] = ...,
-                   sift_n_features: int = ...):
+                   ):
         """Set config of Classifier
 
         :param path_to_icon: path containing character icons
         :param f_cid: function convert filename to cid
         :param f_star: function convert filename to star
-        :param sift_n_features: number of sift features
         :return: None
         """
         if path_to_icon is not ...:
@@ -95,16 +104,11 @@ class BoxDetector:
             self.f_cid = f_cid
         if f_star is not ...:
             self.f_star = f_star
-        if sift_n_features is not ...:
-            self.sift_n_features = sift_n_features
 
     def init(self):
         self.inited = False
         self.descriptors = []
-        self.images = []
         self._path_to_icons = os.path.expanduser(self.path_to_icons)
-
-        sift = cv2.xfeatures2d.SIFT_create(self.sift_n_features)
 
         files = os.listdir(self.path_to_icons)
         for file in files:
@@ -114,41 +118,43 @@ class BoxDetector:
 
                 img = cv2.imread(os.path.join(self.path_to_icons, file))
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                _, des = sift.detectAndCompute(gray, None)
 
+                _, des = self._extractor.detectAndCompute(gray, None)
                 self.descriptors.append(((cid, star), des))
 
         self.inited = True
 
     def _classify(self, img):
-        if not self.descriptors:
-            raise ValueError("Classifier not initialized! Call init() first")
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, query_des = self._extractor.detectAndCompute(gray, None)
 
-        sift = cv2.xfeatures2d.SIFT_create(self.sift_n_features)
-        query_kp, query_ds = sift.detectAndCompute(img, None)
-
-        index_params = dict(algorithm=0, trees=5)
-        search_params = dict(checks=50)
-        flann = cv2.FlannBasedMatcher(index_params, search_params)
-
-        all_matches = {}
+        dict_matches = {}
         for (cid, star), des in self.descriptors:
-            matches = flann.knnMatch(query_ds, des, k=2)
-            good = []
-            for m, n in matches:
-                if m.distance < 0.75 * n.distance:
-                    good.append(m)
+            matches = self._matcher.match(query_des, des)
+            dict_matches[(cid, star)] = matches
 
-            all_matches[(cid, star)] = len(good)
+        thresh_distance = img.shape[0]
+        retries = 0
+        result = (1000, 3)
+        # print(f'----------')
+        while retries < 6:
+            # print(f'start from dist = {thresh_distance}')
+            max_matches = 0
+            for key, matches in dict_matches.items():
+                t = len(list(filter(lambda m: m.distance < thresh_distance, matches)))
+                if t > max_matches:
+                    max_matches = t
+                    result = key
 
-        max_matches = None
-        result = None
-        for (cid, star), matches in all_matches.items():
-            if max_matches is None or matches > max_matches:
-                max_matches = matches
-                result = (cid, star)
+            if max_matches < 0.75 * self.classify_thresh:
+                thresh_distance *= 1.2
+            elif max_matches > 1.25 * self.classify_thresh:
+                thresh_distance *= 0.8
+            else:
+                break
+            retries += 1
 
-        return result if max_matches > self.classify_thresh else None
+        return result
 
     def detect(self, img) -> List[Tuple[int, int]]:
         """Detect box characters
@@ -156,11 +162,13 @@ class BoxDetector:
         :param img: Image of box, in OpenCV form
         :return: List[Tuple[cid, star]]
         """
+        if not self.available():
+            raise ValueError("Detector not initialized! Call init() first")
+
         bounding_boxes = detect_bounding_box(img)
         box = []
         for b in bounding_boxes:
             x, y, w, h = b
-            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
             chara_im = img[y:y + h, x:x + w]
             chara_id, icon_star = self._classify(chara_im)
 

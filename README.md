@@ -6,8 +6,29 @@ Auto detect characters and stars in box screenshot
 
 **This method is SLOW so plz never call it in main thread**
 
+**Optimized, but still take about 2s per image**
+
+#### Dependencies
+```shell script
+pip install opencv-contrib-python
+```
 
 #### Example
+```python
+import cv2
+from box_detector import BoxDetector
+
+box_detector = BoxDetector()
+box_detector.set_config(path_to_icon=f'./unit')
+box_detector.init()
+
+img = cv2.imread("test.jpg")
+
+print(box_detector.detect(img))
+```
+
+
+#### Example On Bot
 ```python
 import asyncio
 import aiohttp
@@ -29,7 +50,7 @@ _detector.init()
 
 # Must executed in worker thread
 def detect_box(img):
-    # Took about 6.5 s
+    # Took about 2.1 s
     res = _detector.detect(img)
 
     # Store character data
