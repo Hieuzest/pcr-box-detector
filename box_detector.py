@@ -55,29 +55,25 @@ class BoxDetector:
         self.path_to_icons = r'./res/img/priconne/unit/'
         self._path_to_icons = os.path.expanduser(self.path_to_icons)
 
+        self.default_result = (1000, 3)
+
         self.classify_thresh = 10
         self.star_position_xs = [
-            26, 50, 74, 98, 122
+            0.125, 0.25, 0.375, 0.5, 0.625
         ]
-        self.star_position_ys = [
-            170, 170, 170, 170, 170
-        ]
-        self.icon_normal_width = 197
-        self.icon_normal_height = 197
+        self.star_position_ys = [0.86] * 5
+        self.icon_norm_size = (64, 64)
 
         self.f_cid = lambda s: int(s[10:14])
         self.f_star = lambda s: int(s[14])
 
-        # self._detector = cv2.BRISK(thresh=10, octaves=1)
-
-        # self._extractor = cv2.DescriptorExtractor_create("BRISK")
+        # self._extractor = cv2.BRISK_create(thresh=10, octaves=1)
         self._extractor = cv2.xfeatures2d.SIFT_create()
+        # self._extractor = cv2.ORB_create()
         # self._extractor = cv2.xfeatures2d.SURF_create()
 
         self._matcher = cv2.BFMatcher(cv2.NORM_L2)
-        # index_params = dict(algorithm=0, trees=5)
-        # search_params = dict(checks=50)
-        # self._matcher = cv2.FlannBasedMatcher(index_params, search_params)
+        # self._matcher = cv2.FlannBasedMatcher(dict(algorithm=0, trees=5), dict(checks=50))
 
     def available(self) -> bool:
         """Test if detector is available
@@ -117,14 +113,17 @@ class BoxDetector:
                 star = self.f_star(file)
 
                 img = cv2.imread(os.path.join(self.path_to_icons, file))
+                img = cv2.resize(img, self.icon_norm_size)
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
                 _, des = self._extractor.detectAndCompute(gray, None)
+
                 self.descriptors.append(((cid, star), des))
 
         self.inited = True
 
     def _classify(self, img):
+        img = cv2.resize(img, self.icon_norm_size)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         _, query_des = self._extractor.detectAndCompute(gray, None)
 
@@ -133,12 +132,11 @@ class BoxDetector:
             matches = self._matcher.match(query_des, des)
             dict_matches[(cid, star)] = matches
 
-        thresh_distance = img.shape[0]
+        thresh_distance = self.icon_norm_size[0] * 3
         retries = 0
-        result = (1000, 3)
-        # print(f'----------')
-        while retries < 6:
-            # print(f'start from dist = {thresh_distance}')
+        result = self.default_result
+
+        while retries < 10:
             max_matches = 0
             for key, matches in dict_matches.items():
                 t = len(list(filter(lambda m: m.distance < thresh_distance, matches)))
@@ -147,9 +145,9 @@ class BoxDetector:
                     result = key
 
             if max_matches < 0.75 * self.classify_thresh:
-                thresh_distance *= 1.2
+                thresh_distance *= 1.15
             elif max_matches > 1.25 * self.classify_thresh:
-                thresh_distance *= 0.8
+                thresh_distance *= 0.85
             else:
                 break
             retries += 1
@@ -177,8 +175,8 @@ class BoxDetector:
             else:
                 stars = 0
                 for (x, y) in zip(self.star_position_xs, self.star_position_ys):
-                    x = int(x * w / self.icon_normal_width)
-                    y = int(y * h / self.icon_normal_height)
+                    x = int(x * w)
+                    y = int(y * h)
                     if chara_im[y, x, 0] < 140:
                         stars += 1
 

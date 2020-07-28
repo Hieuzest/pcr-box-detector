@@ -4,14 +4,17 @@ For Princess Connect Re:DIVE
 
 Auto detect characters and stars in box screenshot
 
-**This method is SLOW so plz never call it in main thread**
+However, the detector should be executed in ThreadPoolExecutor, due to its 0.3s cost
 
-**Optimized, but still take about 2s per image**
+This repo contains a working example plugin for [HoshinoBot](https://github.com/Ice-Cirno/HoshinoBot)
 
 #### Dependencies
 ```shell script
 pip install opencv-contrib-python
 ```
+SIFT is not patented now in OpenCV 3.4.10, 4.3.0 or above.
+
+If no distribution found, try updating your pip using `pip install -U pip`
 
 #### Example
 ```python
@@ -27,48 +30,9 @@ img = cv2.imread("test.jpg")
 print(box_detector.detect(img))
 ```
 
-
-#### Example On Bot
-```python
-import asyncio
-import aiohttp
-import cv2
-import numpy as np
-
-from box_detector import BoxDetector
-
-_detector = BoxDetector()
-
-# By default, the path is suitable for Hoshino Bot
-_detector.set_config(path_to_icon=f"PATH_TO_UNINTS")
-
-# Generally this should not be executed in main thread
-# Took about 1.5 s
-_detector.init()
-
-...
-
-# Must executed in worker thread
-def detect_box(img):
-    # Took about 2.1 s
-    res = _detector.detect(img)
-
-    # Store character data
-
-    # Use synchronous method to send reply
-    # Or create task in main event loop
-    # Depends on framework
-
-async def _handler(...):
-    ...
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            content = await response.content.read()
-    
-            file_bytes = np.asarray(bytearray(content), dtype=np.uint8)
-            img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-    
-            asyncio.get_event_loop().run_in_executor(None, detect_box, img)
-
+#### Build into HoshinoBot
+A recommended workflow is:
+```shell script
+.../hoshino/modules/priconne/$ git submodule add https://github.com/Hieuzest/pcr-box-detector box_detector
 ```
+This should be enough to go.
