@@ -1,7 +1,5 @@
 import asyncio
 import aiohttp
-import cv2
-import numpy as np
 
 from itertools import starmap
 
@@ -24,7 +22,7 @@ else:
 _detector = BoxDetector()
 _detector.init()
 
-# @sv.on_prefix('box')
+
 async def _handler(bot, event):
     for ms in event.message:
         if ms.type == 'image':
@@ -34,9 +32,7 @@ async def _handler(bot, event):
                 url = ms.data['url']
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url) as response:
-                        content = await response.content.read()
-                        file_bytes = np.asarray(bytearray(content), dtype=np.uint8)
-                        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR).copy()
+                        img = await response.content.read()
 
                         res = await asyncio.get_event_loop().run_in_executor(None, _detector.detect, img)
                         res = starmap(lambda cid, star: f'{star}★{fromid(cid, star=star).name}', res)

@@ -1,6 +1,8 @@
-from typing import Tuple, List, Callable
+from typing import Tuple, List, Callable, Any
 
 import cv2
+from PIL import Image
+import numpy as np
 import os
 import itertools
 
@@ -49,6 +51,9 @@ def detect_bounding_box(img_rgb):
 
 class BoxDetector:
 
+    BRISK = 0
+    SIFT = 1
+
     def __init__(self):
         self.inited = False
         self.descriptors = []
@@ -57,7 +62,10 @@ class BoxDetector:
 
         self.default_result = (1000, 3)
 
-        self.classify_thresh = 10
+        self.classify_thresh = 15
+        self.classify_distance_k = 3.0
+        self.classify_calc_times = 10
+
         self.star_position_xs = [
             0.125, 0.25, 0.375, 0.5, 0.625
         ]
@@ -67,8 +75,8 @@ class BoxDetector:
         self.f_cid = lambda s: int(s[10:14])
         self.f_star = lambda s: int(s[14])
 
-        # self._extractor = cv2.BRISK_create(thresh=10, octaves=1)
-        self._extractor = cv2.xfeatures2d.SIFT_create()
+        self._extractor = cv2.BRISK_create(thresh=10, octaves=2)
+        # self._extractor = cv2.xfeatures2d.SIFT_create()
         # self._extractor = cv2.ORB_create()
         # self._extractor = cv2.xfeatures2d.SURF_create()
 
@@ -86,13 +94,25 @@ class BoxDetector:
                    path_to_icon: str = ...,
                    f_cid: Callable[[str], int] = ...,
                    f_star: Callable[[str], int] = ...,
+                   default_result = ...,
+                   extractor: Any = ...,
+                   classify_thresh: int = ...,
+                   classify_distance_k: float = ...,
+                   classify_calc_times: int = ...,
+                   icon_norm_size: Tuple[int, int] = ...
                    ):
-        """Set config of Classifier
+        """Set config of classifier
 
         :param path_to_icon: path containing character icons
         :param f_cid: function convert filename to cid
         :param f_star: function convert filename to star
-        :return: None
+        :param default_result: return if not found
+        :param extractor: BRISK or SIFT or cv2.FeatureDescriptor
+        :param classify_thresh: number of matched points
+        :param classify_distance_k: initialized distance thresh param
+        :param classify_calc_times: hierarchical calc times
+        :param icon_norm_size: normalized size of unit icons
+        :return:
         """
         if path_to_icon is not ...:
             self.path_to_icons = path_to_icon
@@ -100,6 +120,22 @@ class BoxDetector:
             self.f_cid = f_cid
         if f_star is not ...:
             self.f_star = f_star
+        if default_result is not ...:
+            self.default_result = default_result
+        if extractor == self.BRISK:
+            self._extractor = cv2.BRISK_create(thresh=10, octaves=1)
+        elif extractor == self.SIFT:
+            self._extractor = cv2.xfeatures2d.SIFT_create()
+        elif extractor is not ...:
+            self._extractor = extractor
+        if classify_thresh is not ...:
+            self.classify_thresh = classify_thresh
+        if classify_distance_k is not ...:
+            self.classify_distance_k = classify_distance_k
+        if classify_calc_times is not ...:
+            self.classify_calc_times = classify_calc_times
+        if icon_norm_size is not ...:
+            self.icon_norm_size = icon_norm_size
 
     def init(self):
         self.inited = False
@@ -132,11 +168,11 @@ class BoxDetector:
             matches = self._matcher.match(query_des, des)
             dict_matches[(cid, star)] = matches
 
-        thresh_distance = self.icon_norm_size[0] * 3
+        thresh_distance = self.icon_norm_size[0] * self.classify_distance_k
         retries = 0
         result = self.default_result
 
-        while retries < 10:
+        while retries < self.classify_calc_times:
             max_matches = 0
             for key, matches in dict_matches.items():
                 t = len(list(filter(lambda m: m.distance < thresh_distance, matches)))
@@ -144,24 +180,30 @@ class BoxDetector:
                     max_matches = t
                     result = key
 
-            if max_matches < 0.75 * self.classify_thresh:
-                thresh_distance *= 1.15
-            elif max_matches > 1.25 * self.classify_thresh:
-                thresh_distance *= 0.85
+            if max_matches < 0.77 * self.classify_thresh:
+                thresh_distance *= 1.16
+            elif max_matches > 1.3 * self.classify_thresh:
+                thresh_distance *= 0.86
             else:
                 break
             retries += 1
-
         return result
 
-    def detect(self, img) -> List[Tuple[int, int]]:
+    def detect(self, img: Any) -> List[Tuple[int, int]]:
         """Detect box characters
 
-        :param img: Image of box, in OpenCV form
+        :param img: Image of box, can be cv2 / PIL / bytes form
         :return: List[Tuple[cid, star]]
         """
         if not self.available():
             raise ValueError("Detector not initialized! Call init() first")
+
+        if isinstance(img, bytes):
+            img = cv2.imdecode(np.asarray(bytearray(img), dtype=np.uint8), cv2.IMREAD_COLOR).copy()
+        if isinstance(img, Image.Image):
+            img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+        elif not isinstance(img, np.ndarray):
+            raise TypeError("Unsupported type of img!")
 
         bounding_boxes = detect_bounding_box(img)
         box = []

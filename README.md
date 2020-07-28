@@ -33,6 +33,6 @@ print(box_detector.detect(img))
 #### Build into HoshinoBot
 A recommended workflow is:
 ```shell script
-.../hoshino/modules/priconne/$ git submodule add https://github.com/Hieuzest/pcr-box-detector box_detector
+.../hoshino/modules/priconne/$ git submodule add -b master https://github.com/Hieuzest/pcr-box-detector box_detector
 ```
 This should be enough to go.
