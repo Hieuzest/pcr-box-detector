@@ -1,7 +1,11 @@
 from typing import Tuple, List, Callable, Any
 
 import cv2
-from PIL import Image
+try:
+    from PIL import Image
+    _has_pil = True
+except:
+    _has_pil = False
 import numpy as np
 import os
 import itertools
@@ -200,7 +204,7 @@ class BoxDetector:
 
         if isinstance(img, bytes):
             img = cv2.imdecode(np.asarray(bytearray(img), dtype=np.uint8), cv2.IMREAD_COLOR).copy()
-        if isinstance(img, Image.Image):
+        if _has_pil and isinstance(img, Image.Image):
             img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
         elif not isinstance(img, np.ndarray):
             raise TypeError("Unsupported type of img!")

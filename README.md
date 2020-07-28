@@ -12,9 +12,18 @@ This repo contains a working example plugin for [HoshinoBot](https://github.com/
 ```shell script
 pip install opencv-contrib-python
 ```
+
+##### If using SIFT:
+
 SIFT is not patented now in OpenCV 3.4.10, 4.3.0 or above.
 
 If no distribution found, try updating your pip using `pip install -U pip`
+
+#### Usage
+
+BoxDetector::detect(img) -> List[Tuple[CharaId, Star]]
+
+-   accept image in OpenCv / PIL / bytes forms
 
 #### Example
 ```python
