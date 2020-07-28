@@ -74,7 +74,7 @@ class BoxDetector:
             0.125, 0.25, 0.375, 0.5, 0.625
         ]
         self.star_position_ys = [0.86] * 5
-        self.icon_norm_size = (64, 64)
+        self.icon_norm_size = (70, 70)
 
         self.f_cid = lambda s: int(s[10:14])
         self.f_star = lambda s: int(s[14])

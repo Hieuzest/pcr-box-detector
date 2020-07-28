@@ -4,7 +4,7 @@ For Princess Connect Re:DIVE
 
 Auto detect characters and stars in box screenshot
 
-However, the detector should be executed in ThreadPoolExecutor, due to its 0.3s cost
+However, the detector should be executed in ThreadPoolExecutor, due to its cost
 
 This repo contains a working example plugin for [HoshinoBot](https://github.com/Ice-Cirno/HoshinoBot)
 
@@ -21,9 +21,7 @@ If no distribution found, try updating your pip using `pip install -U pip`
 
 #### Usage
 
-BoxDetector::detect(img) -> List[Tuple[CharaId, Star]]
-
--   accept image in OpenCv / PIL / bytes forms
+BoxDetector::detect(img) accept image in OpenCv / PIL / bytes forms
 
 #### Example
 ```python
